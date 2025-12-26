@@ -176,11 +176,6 @@ from irontelemetry import (
 - Full type hints support
 - async/await support
 
-## Links
-
-- [Documentation](https://www.irontelemetry.com/docs)
-- [Dashboard](https://www.irontelemetry.com)
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
