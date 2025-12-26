@@ -25,6 +25,16 @@ from .types import (
     User,
 )
 
+# Global debug logging flag. When enabled, all IronTelemetry clients
+# will output debug information to the console.
+enable_debug_logging: bool = False
+
+
+def set_debug_logging(enabled: bool) -> None:
+    """Enable or disable global debug logging for all TelemetryClient instances."""
+    global enable_debug_logging
+    enable_debug_logging = enabled
+
 
 class TelemetryClient:
     """Main IronTelemetry client class."""
@@ -49,7 +59,7 @@ class TelemetryClient:
         self._user: Optional[User] = None
         self._current_journey: Optional[Journey] = None
 
-        if self._options.debug:
+        if self._options.debug or enable_debug_logging:
             print(f"[IronTelemetry] Initialized with DSN: {self._options.dsn}")
 
     def capture_exception(
@@ -98,6 +108,45 @@ class TelemetryClient:
         event = self._create_event(level, message)
         return await self._send_event_async(event)
 
+    def log_message(
+        self,
+        level: SeverityLevel,
+        title: str,
+        message: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> SendResult:
+        """Log a structured message with title, message, and optional data.
+
+        Useful for structured logging that differentiates the log title from its details.
+
+        Args:
+            level: The severity level of the log
+            title: A short, descriptive title for the log entry
+            message: Optional detailed message
+            data: Optional additional data to attach to the log
+        """
+        full_message = f"{title}: {message}" if message else title
+        event = self._create_event(level, full_message)
+        event.extra["logTitle"] = title
+        if data:
+            event.extra["logData"] = data
+        return self._send_event(event)
+
+    async def log_message_async(
+        self,
+        level: SeverityLevel,
+        title: str,
+        message: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> SendResult:
+        """Log a structured message asynchronously."""
+        full_message = f"{title}: {message}" if message else title
+        event = self._create_event(level, full_message)
+        event.extra["logTitle"] = title
+        if data:
+            event.extra["logData"] = data
+        return await self._send_event_async(event)
+
     def add_breadcrumb(
         self,
         message: str,
@@ -107,6 +156,14 @@ class TelemetryClient:
     ) -> None:
         """Add a breadcrumb."""
         self._breadcrumbs.add(message, category, level, data)
+
+    def get_breadcrumbs(self) -> List[Breadcrumb]:
+        """Get a copy of the current breadcrumbs list."""
+        return self._breadcrumbs.get_all()
+
+    def clear_breadcrumbs(self) -> None:
+        """Clear all breadcrumbs."""
+        self._breadcrumbs.clear()
 
     def set_user(
         self,
@@ -194,7 +251,7 @@ class TelemetryClient:
         """Send an event."""
         # Check sample rate
         if random.random() > self._options.sample_rate:
-            if self._options.debug:
+            if self._options.debug or enable_debug_logging:
                 print("[IronTelemetry] Event dropped due to sample rate")
             return SendResult(success=True, event_id=event.event_id)
 
@@ -202,7 +259,7 @@ class TelemetryClient:
         if self._options.before_send:
             result = self._options.before_send(event)
             if result is None:
-                if self._options.debug:
+                if self._options.debug or enable_debug_logging:
                     print("[IronTelemetry] Event dropped by before_send hook")
                 return SendResult(success=True, event_id=event.event_id)
             event = result
@@ -225,7 +282,7 @@ class TelemetryClient:
         """Send an event asynchronously."""
         # Check sample rate
         if random.random() > self._options.sample_rate:
-            if self._options.debug:
+            if self._options.debug or enable_debug_logging:
                 print("[IronTelemetry] Event dropped due to sample rate")
             return SendResult(success=True, event_id=event.event_id)
 
@@ -233,7 +290,7 @@ class TelemetryClient:
         if self._options.before_send:
             result = self._options.before_send(event)
             if result is None:
-                if self._options.debug:
+                if self._options.debug or enable_debug_logging:
                     print("[IronTelemetry] Event dropped by before_send hook")
                 return SendResult(success=True, event_id=event.event_id)
             event = result
